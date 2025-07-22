@@ -1,12 +1,14 @@
-const Student = require("../models/Student")
+const Student = require("../models/Student");
+const axios = require("axios");
 
-// ✅ Create student
 const createStudent = async (req, res) => {
   try {
     const { firstName, lastName, email } = req.body;
 
     const existing = await Student.findOne({ email });
-    if (existing) return res.status(409).json({ message: "Student already exists" });
+    if (existing) {
+      return res.status(409).json({ message: "Student already exists" });
+    }
 
     const student = new Student({ firstName, lastName, email });
     await student.save();
@@ -16,49 +18,140 @@ const createStudent = async (req, res) => {
   }
 };
 
-// ✅ Assign exam
-const assignExam = async (req, res) => {
+const assignBriefToStudent = async (req, res) => {
+  const { studentId, briefId } = req.params;
+
   try {
-    const { studentId } = req.params;
-    const { examId } = req.body;
+    const briefRes = await axios.get(`${process.env.BRIEF_URL}/${briefId}`);
+    const brief = briefRes.data;
 
-    const student = await Student.findById(studentId);
-    if (!student) return res.status(404).json({ message: "Student not found" });
-
-    if (!student.assignedExams.includes(examId)) {
-      student.assignedExams.push(examId);
-      await student.save();
+    if (!brief) {
+      return res.status(404).json({ message: "Brief not found" });
     }
 
-    res.json({ message: "Exam assigned", student });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+    const fetchedSkills = [];
+    for (const code of brief.skillCodes) {
+      const skillRes = await axios.get(
+        `${process.env.SKILLS_URL}/code/${code}`
+      );
+      const skill = skillRes.data;
 
-// ✅ Submit exam
-const submitExam = async (req, res) => {
-  try {
-    const { studentId } = req.params;
-    const { examId, links } = req.body;
+      if (skill) {
+        fetchedSkills.push({
+          code: skill.code,
+          title: skill.title,
+          isValid: undefined,
+          subSkills: skill.subSkills.map((sub) => ({
+            title: sub.title,
+            priority: sub.priority,
+            isValid: undefined,
+          })),
+        });
+      }
+    }
 
     const student = await Student.findById(studentId);
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
 
-    student.submissions.push({ examId, links });
+    const alreadyAssigned = student.assignedBriefs.some(
+      (b) => b.briefId === briefId
+    );
+
+    if (alreadyAssigned) {
+      return res
+        .status(400)
+        .json({ message: "Brief already assigned to this student" });
+    }
+
+    student.assignedBriefs.push({
+      briefId,
+      skills: fetchedSkills,
+      submissions: [],
+    });
+
     await student.save();
-
-    res.json({ message: "Submission saved", student });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(201).json({ message: "Brief assigned successfully", student });
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).json({ error: "Failed to assign brief" });
   }
 };
 
-// ✅ Get all students
-const getStudents = async (req, res) => {
-  const students = await Student.find();
-  res.json(students);
+const submitBrief = async (req, res) => {
+  const { studentId, briefId } = req.params;
+  const { links, description } = req.body;
+
+  try {
+    if (!Array.isArray(links) || links.length === 0) {
+      return res.status(400).json({ message: "At least one link is required" });
+    }
+    if (!description || description.trim() === "") {
+      return res.status(400).json({ message: "Description is required" });
+    }
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const assignedBrief = student.assignedBriefs.find(
+      (b) => b.briefId === briefId
+    );
+    if (!assignedBrief) {
+      return res
+        .status(404)
+        .json({ message: "Brief not assigned to this student" });
+    }
+
+    const newSubmission = { links, description };
+    assignedBrief.submissions.push(newSubmission);
+    await student.save();
+
+    return res.status(201).json({
+      message: "Submission added successfully",
+      submissions: assignedBrief.submissions,
+    });
+  } catch (error) {
+    console.error("Submit Brief Error:", error.message);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 };
 
+const getStudents = async (req, res) => {
+  try {
+    const students = await Student.find();
 
-module.exports = { createStudent, assignExam, submitExam, getStudents}
+    if (!students || students.length === 0) {
+      return res.status(404).josn({ message: "No Students available" });
+    }
+
+    res.status(201).json(students);
+  } catch (error) {
+    console.error("Server Error", error.message)
+    res.json(500).json({ message: "Server error", error: error.message })
+  }
+};
+
+const getStudent = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id)
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found"})
+    }
+
+    res.status(201).json(student)
+  } catch (error) {
+    console.error("Server Error", error.message)
+    res.json(500).json({ message: "Server error", error: error.message })
+  }
+};
+
+module.exports = {
+  createStudent,
+  assignBriefToStudent,
+  submitBrief,
+  getStudents,
+  getStudent,
+};

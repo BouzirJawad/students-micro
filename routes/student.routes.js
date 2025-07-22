@@ -1,11 +1,15 @@
 const express = require('express')
 const router = express.Router()
 const studentController = require('../controllers/student.controller')
+const studentValidation = require('../controllers/studentValidation.controller')
 
 router.post("/create", studentController.createStudent)
 router.get("/", studentController.getStudents)
-router.post("/:studentId/assign-brief", studentController.assignExam)
-router.post("/:studentId/submit", studentController.submitExam)
+router.get("/student/:id", studentController.getStudent)
+
+router.post("/student/:studentId/brief/:briefId/submit", studentController.submitBrief)
+router.post("/student/:studentId/brief/:briefId/assign-brief", studentController.assignBriefToStudent)
+router.put("/student/:studentId/brief/:briefId/skill/:skillCode/subskill/:subSkillTitle/validate", studentValidation.validateStudentSubSkill)
 
 router.get("/test", async (req, res) => {
     res.send("Students server is working")
