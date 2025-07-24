@@ -3,7 +3,7 @@ const router = express.Router()
 const studentController = require('../controllers/student.controller')
 const studentValidation = require('../controllers/studentValidation.controller')
 
-router.post("/create", studentController.createStudent)
+router.post("/student/:userId/create", studentController.createStudent)
 router.get("/", studentController.getStudents)
 router.get("/student/:id", studentController.getStudent)
 

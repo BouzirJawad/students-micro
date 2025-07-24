@@ -30,13 +30,13 @@ const submissionSchema = new mongoose.Schema({
       validator: function (arr) {
         return Array.isArray(arr) && arr.length > 0;
       },
-      message: "At least one link is required"
-    }
+      message: "At least one link is required",
+    },
   },
   description: {
     type: String,
     required: [true, "Description is required"],
-    trim: true
+    trim: true,
   },
 });
 
@@ -50,24 +50,14 @@ const assignedBriefSchema = new mongoose.Schema({
 });
 
 const studentSchema = new mongoose.Schema({
-  firstName: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  lastName: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  email: {
+  userId: {
     type: String,
     required: true,
     unique: true,
   },
-  assignedBriefs: [assignedBriefSchema],
+  assignedBriefs: [assignedBriefSchema], 
 });
 
-const studentModel = mongoose.model('Student', studentSchema);
+const studentModel = mongoose.model("Student", studentSchema);
 
 module.exports = studentModel;
